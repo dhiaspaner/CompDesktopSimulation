@@ -1,0 +1,27 @@
+
+
+insert:
+INSERT OR REPLACE INTO userEntity(
+    firstName,
+    lastName,
+    age,
+    birthDate
+) VALUES ?;
+
+getAllUsers:
+SELECT * FROM  userEntity;
+
+update:
+UPDATE userEntity SET
+    firstName =:firstName,
+    lastName =:lastName,
+    age =:age,
+    birthDate = :birthDate
+    WHERE firstName = :firstName AND lastName =:lastName;
+
+
+delete:
+DELETE FROM userEntity WHERE firstName = :firstName AND lastName =:lastName;
+
+
+

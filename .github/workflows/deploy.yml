@@ -1,0 +1,112 @@
+name: Tag created
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-android:
+    runs-on: ubuntu-latest
+
+    env:
+      tag: ${{ github.event.release.tag_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v2
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+          key: ${{ runner.os }}-${{ hashFiles('**/.lock') }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Write release version
+        shell: bash
+        run: |
+          VERSION=${tag#v}
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build a debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Edit published release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$tag" \
+              ./apps/android/build/outputs/apk/debug/android-debug.apk
+
+  deploy-desktop:
+    strategy:
+      matrix:
+        include:
+          - outputDir: dmg
+            outputExtension: dmg
+            os: macos-14
+          #          - outputDir: dmg
+          #            outputExtension: dmg
+          #            os: macos-latest
+          - outputDir: exe
+            outputExtension: exe
+            os: windows-latest
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      tag: ${{ github.event.release.tag_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+          key: ${{ runner.os }}-${{ hashFiles('**/.lock') }}
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Write release version
+        shell: bash
+        run: |
+          VERSION=${tag#v}
+          echo Version: $VERSION
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build a release package
+        run: ./gradlew packageDistributionForCurrentOS
+
+      - name: Edit published release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$tag" \
+              ./apps/desktop/build/compose/binaries/main/${{ matrix.outputDir }}/Starter-${tag#v}.${{ matrix.outputExtension }}
